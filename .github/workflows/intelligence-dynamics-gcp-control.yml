@@ -41,7 +41,7 @@ jobs:
           root = pathlib.Path(os.environ["CONTROL_DIR"])
           cfg = json.loads((root / "config.json").read_text())
           desired = json.loads((root / "desired.json").read_text())
-          receipt_path = root / "receipt.json"
+          receipts_dir = root / "receipts"
 
           def output(k, v):
               with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
@@ -64,11 +64,15 @@ jobs:
               raise SystemExit("generation must be positive integer")
 
           previous_generation = 0
-          if receipt_path.exists():
-              try:
-                  previous_generation = int(json.loads(receipt_path.read_text()).get("generation") or 0)
-              except Exception:
-                  previous_generation = 0
+          if receipts_dir.exists():
+              for rp in receipts_dir.glob("*.json"):
+                  try:
+                      previous_generation = max(
+                          previous_generation,
+                          int(json.loads(rp.read_text()).get("generation") or 0),
+                      )
+                  except Exception:
+                      pass
           if generation < previous_generation:
               raise SystemExit("stale generation rollback rejected")
 
@@ -115,7 +119,9 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import datetime as dt, json, os, pathlib
-          p=pathlib.Path(os.environ["CONTROL_DIR"])/"receipt.json"
+          d=pathlib.Path(os.environ["CONTROL_DIR"])/"receipts"
+d.mkdir(parents=True, exist_ok=True)
+p=d/(os.environ["GITHUB_RUN_ID"]+"-"+os.environ["GITHUB_RUN_ATTEMPT"]+".json")
           p.write_text(json.dumps({
             "schema_version":1,
             "controller":"github-actions-wif",
@@ -201,7 +207,9 @@ jobs:
 
           python3 - <<PY
           import datetime as dt, json, os, pathlib
-          p=pathlib.Path(os.environ["CONTROL_DIR"])/"receipt.json"
+          d=pathlib.Path(os.environ["CONTROL_DIR"])/"receipts"
+d.mkdir(parents=True, exist_ok=True)
+p=d/(os.environ["GITHUB_RUN_ID"]+"-"+os.environ["GITHUB_RUN_ATTEMPT"]+".json")
           p.write_text(json.dumps({
             "schema_version":1,
             "controller":"github-actions-wif",
@@ -231,9 +239,23 @@ jobs:
           set -euo pipefail
           git config user.name "Intelligence Dynamics GCP Controller"
           git config user.email "gcp-controller@intelligence-dynamics.invalid"
-          git add "$CONTROL_DIR/receipt.json"
+          git add "$CONTROL_DIR/receipts/"
           if git diff --cached --quiet; then
             exit 0
           fi
           git commit -m "Record Intelligence Dynamics GCP control receipt"
-          git push origin HEAD:intelligence-dynamics-gcp-control
+
+          # Receipt files are run-unique. Rebase onto control updates before push
+          # so a concurrent desired/config commit cannot cause a non-fast-forward
+          # loss of evidence.
+          pushed=false
+          for attempt in 1 2 3; do
+            git fetch origin intelligence-dynamics-gcp-control
+            git rebase origin/intelligence-dynamics-gcp-control
+            if git push origin HEAD:intelligence-dynamics-gcp-control; then
+              pushed=true
+              break
+            fi
+            sleep "$(( attempt * 2 ))"
+          done
+          [[ "$pushed" == "true" ]]
