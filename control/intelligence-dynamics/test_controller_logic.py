@@ -38,9 +38,9 @@ class ControlLogicTests(unittest.TestCase):
         self.assertFalse(got["configured"])
         self.assertEqual("TERMINATED", got["effective_state"])
 
-    def test_running_requires_unexpired_lease(self):
-        with self.assertRaises(ControlError):
-            validate(cfg(), desired("RUNNING", lease=""), now=NOW)
+    def test_running_without_lease_fails_closed(self):
+        got = validate(cfg(), desired("RUNNING", lease=""), now=NOW)
+        self.assertEqual("TERMINATED", got["effective_state"])
 
     def test_expired_lease_becomes_terminated(self):
         got = validate(
