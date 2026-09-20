@@ -26,6 +26,7 @@ def desired(state="TERMINATED", generation=1, requested=None, lease=None, **kw):
         "target_instance": "intelligence-dynamics-worker",
         "desired_state": state,
         "generation": generation,
+        "start_armed": False,
         "requested_at_utc": requested or NOW.isoformat(),
         "lease_until_utc": lease or "",
     }
@@ -42,11 +43,25 @@ class ControlLogicTests(unittest.TestCase):
         got = validate(cfg(), desired("RUNNING", lease=""), now=NOW)
         self.assertEqual("TERMINATED", got["effective_state"])
 
+    def test_valid_lease_but_unarmed_fails_closed(self):
+        got = validate(
+            cfg(),
+            desired(
+                "RUNNING",
+                start_armed=False,
+                requested=NOW.isoformat(),
+                lease=(NOW+dt.timedelta(minutes=5)).isoformat(),
+            ),
+            now=NOW,
+        )
+        self.assertEqual("TERMINATED", got["effective_state"])
+
     def test_expired_lease_becomes_terminated(self):
         got = validate(
             cfg(),
             desired(
                 "RUNNING",
+                start_armed=True,
                 requested=(NOW-dt.timedelta(minutes=2)).isoformat(),
                 lease=(NOW-dt.timedelta(seconds=1)).isoformat(),
             ),
@@ -59,6 +74,7 @@ class ControlLogicTests(unittest.TestCase):
             cfg(),
             desired(
                 "RUNNING",
+                start_armed=True,
                 requested=NOW.isoformat(),
                 lease=(NOW+dt.timedelta(minutes=5)).isoformat(),
             ),
@@ -71,6 +87,7 @@ class ControlLogicTests(unittest.TestCase):
             cfg(),
             desired(
                 "RUNNING",
+                start_armed=True,
                 requested=NOW.isoformat(),
                 lease=(NOW+dt.timedelta(minutes=371)).isoformat(),
             ),
