@@ -135,9 +135,21 @@ def main() -> int:
     parser.add_argument("--desired", required=True)
     parser.add_argument("--receipts", required=True)
     parser.add_argument("--github-output")
+    parser.add_argument("--project-id", default="")
+    parser.add_argument("--provider", default="")
+    parser.add_argument("--service-account", default="")
+    parser.add_argument("--zone", default="")
     args = parser.parse_args()
 
     cfg = json.loads(pathlib.Path(args.config).read_text())
+    if args.project_id:
+        cfg["project_id"] = args.project_id
+    if args.provider:
+        cfg["workload_identity_provider"] = args.provider
+    if args.service_account:
+        cfg["service_account"] = args.service_account
+    if args.zone:
+        cfg["zone"] = args.zone
     desired = json.loads(pathlib.Path(args.desired).read_text())
     prev = max_receipt_generation(pathlib.Path(args.receipts))
     result = validate(cfg, desired, previous_generation=prev)
