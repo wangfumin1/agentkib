@@ -25,6 +25,10 @@ jobs:
     env:
       CONTROL_DIR: control/intelligence-dynamics
       INSTANCE_NAME: intelligence-dynamics-worker
+      ID_GCP_PROJECT_ID: ${{ vars.ID_GCP_PROJECT_ID }}
+      ID_GCP_WIF_PROVIDER: ${{ vars.ID_GCP_WIF_PROVIDER }}
+      ID_GCP_SERVICE_ACCOUNT: ${{ vars.ID_GCP_SERVICE_ACCOUNT }}
+      ID_GCP_ZONE: ${{ vars.ID_GCP_ZONE }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,7 +51,11 @@ jobs:
             --config "$CONTROL_DIR/config.json" \
             --desired "$CONTROL_DIR/desired.json" \
             --receipts "$CONTROL_DIR/receipts" \
-            --github-output "$GITHUB_OUTPUT"
+            --github-output "$GITHUB_OUTPUT" \
+            --project-id "$ID_GCP_PROJECT_ID" \
+            --provider "$ID_GCP_WIF_PROVIDER" \
+            --service-account "$ID_GCP_SERVICE_ACCOUNT" \
+            --zone "$ID_GCP_ZONE"
 
       - name: Record unconfigured fail-closed state
         if: steps.cfg.outputs.configured != 'true'
@@ -171,8 +179,8 @@ jobs:
             "generation":int(os.environ["GENERATION"]),
             "effective_desired_state":os.environ["EFFECTIVE_STATE"],
             "provider_status":"$final",
-            "project_id":os.environ["PROJECT_ID"],
-            "zone":"$ZONE",
+            "project_id":"REDACTED",
+            "zone":"REDACTED",
             "instance_name":os.environ["INSTANCE_NAME"],
             "operation":"$operation",
             "provider_verified":("$verified" == "true"),
