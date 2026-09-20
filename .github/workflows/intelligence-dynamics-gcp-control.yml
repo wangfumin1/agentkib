@@ -8,6 +8,7 @@ on:
       - "control/intelligence-dynamics/config.json"
       - "control/intelligence-dynamics/desired.json"
       - "control/intelligence-dynamics/*.py"
+      - "control/intelligence-dynamics/apps-script/**"
       - "control/intelligence-dynamics/wif-spec.json"
       - ".github/workflows/intelligence-dynamics-gcp-control.yml"
   workflow_dispatch:
@@ -43,6 +44,12 @@ jobs:
           cd "$CONTROL_DIR"
           python3 test_controller_logic.py
           python3 test_provider_plan.py
+
+          cp apps-script/Code.gs /tmp/intelligence-dynamics-controller.js
+          node --check /tmp/intelligence-dynamics-controller.js
+          printf '\nconsole.log(controllerSelfTest());\n' >> /tmp/intelligence-dynamics-controller.js
+          selftest="$(node /tmp/intelligence-dynamics-controller.js)"
+          [[ "$selftest" == "PASS 5" ]]
 
       - name: Validate fixed control request
         id: cfg
