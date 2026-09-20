@@ -1,0 +1,11 @@
+{
+  "at_utc": "2026-09-20T01:33:08.025+00:00",
+  "controller": "github-actions-wif",
+  "effective_desired_state": "TERMINATED",
+  "error": "WIF config not installed; no GCP operation attempted",
+  "generation": 1789867907110,
+  "operation": "NONE",
+  "provider_status": "UNKNOWN",
+  "schema_version": 1,
+  "status": "NOT_CONFIGURED"
+}
