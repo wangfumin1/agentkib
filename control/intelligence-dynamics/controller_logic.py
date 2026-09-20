@@ -85,13 +85,15 @@ def validate(
     effective = "TERMINATED"
     if desired_state == "RUNNING":
         requested = _parse_time(desired.get("requested_at_utc"), "requested_at_utc")
-        lease = _parse_time(desired.get("lease_until_utc"), "lease_until_utc")
-        if (
-            requested <= now + dt.timedelta(minutes=5)
-            and lease > now
-            and lease - requested <= dt.timedelta(minutes=max_lease)
-        ):
-            effective = "RUNNING"
+        lease_raw = str(desired.get("lease_until_utc") or "").strip()
+        if lease_raw:
+            lease = _parse_time(lease_raw, "lease_until_utc")
+            if (
+                requested <= now + dt.timedelta(minutes=5)
+                and lease > now
+                and lease - requested <= dt.timedelta(minutes=max_lease)
+            ):
+                effective = "RUNNING"
 
     project = str(cfg.get("project_id") or "")
     provider = str(cfg.get("workload_identity_provider") or "")
