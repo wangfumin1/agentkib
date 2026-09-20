@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "controller": "github-actions-wif",
+  "status": "NOT_CONFIGURED",
+  "generation": 0,
+  "effective_desired_state": "TERMINATED",
+  "provider_status": "UNKNOWN",
+  "operation": "NONE",
+  "provider_verified": false,
+  "error": "WIF config not installed; no GCP operation attempted"
+}
