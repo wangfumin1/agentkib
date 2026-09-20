@@ -7,5 +7,6 @@
   "zone": "AUTO",
   "max_lease_minutes": 370,
   "target_instance": "intelligence-dynamics-worker",
-  "note": "Fail-closed until one-time GCP WIF authorization is installed. Standard GitHub-hosted runners are free for this public repository."
+  "note": "Fail-closed until one-time GCP Workload Identity Federation authorization is installed. Direct WIF avoids long-lived keys and service-account impersonation.",
+  "auth_mode": "direct-wif"
 }
