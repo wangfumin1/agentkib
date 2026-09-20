@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "purpose": "Least-privilege keyless control of exactly the Intelligence Dynamics lifecycle workflow",
+  "github": {
+    "owner": "wangfumin1",
+    "repository": "agentkib",
+    "branch": "refs/heads/intelligence-dynamics-gcp-control",
+    "issuer": "https://token.actions.githubusercontent.com"
+  },
+  "workload_identity": {
+    "pool_id": "intelligence-dynamics-github",
+    "provider_id": "agentkib-lifecycle",
+    "attribute_mapping": {
+      "google.subject": "assertion.sub",
+      "attribute.repository": "assertion.repository",
+      "attribute.ref": "assertion.ref"
+    },
+    "attribute_condition": "assertion.repository == 'wangfumin1/agentkib' && assertion.ref == 'refs/heads/intelligence-dynamics-gcp-control'"
+  },
+  "iam": {
+    "custom_role_id": "IntelligenceDynamicsVmLifecycle",
+    "permissions": [
+      "compute.instances.get",
+      "compute.instances.list",
+      "compute.instances.start",
+      "compute.instances.stop"
+    ],
+    "principal_scope": "attribute.repository/wangfumin1/agentkib",
+    "note": "Grant only this custom role. Do not grant Owner, Editor, Compute Admin, or service-account keys."
+  },
+  "github_actions_variables": [
+    "ID_GCP_PROJECT_ID",
+    "ID_GCP_WIF_PROVIDER",
+    "ID_GCP_ZONE"
+  ],
+  "optional_variable": "ID_GCP_SERVICE_ACCOUNT",
+  "preferred_auth_mode": "direct-wif",
+  "secrets_required": [],
+  "fail_closed": true
+}
