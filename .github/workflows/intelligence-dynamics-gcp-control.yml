@@ -1,0 +1,239 @@
+name: Intelligence Dynamics GCP lifecycle control
+
+on:
+  push:
+    branches:
+      - intelligence-dynamics-gcp-control
+    paths:
+      - "control/intelligence-dynamics/config.json"
+      - "control/intelligence-dynamics/desired.json"
+      - ".github/workflows/intelligence-dynamics-gcp-control.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+
+concurrency:
+  group: intelligence-dynamics-gcp-control
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CONTROL_DIR: control/intelligence-dynamics
+      INSTANCE_NAME: intelligence-dynamics-worker
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: intelligence-dynamics-gcp-control
+
+      - name: Validate fixed control request
+        id: cfg
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime as dt, json, os, pathlib, re
+
+          root = pathlib.Path(os.environ["CONTROL_DIR"])
+          cfg = json.loads((root / "config.json").read_text())
+          desired = json.loads((root / "desired.json").read_text())
+          receipt_path = root / "receipt.json"
+
+          def output(k, v):
+              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+                  f.write(f"{k}={v}\n")
+
+          configured = all([
+              cfg.get("project_id"),
+              cfg.get("workload_identity_provider"),
+              cfg.get("service_account"),
+          ])
+
+          if desired.get("schema_version") != 1:
+              raise SystemExit("invalid desired schema_version")
+          if desired.get("target_instance") != os.environ["INSTANCE_NAME"]:
+              raise SystemExit("target instance mismatch")
+          if desired.get("desired_state") not in {"RUNNING", "TERMINATED"}:
+              raise SystemExit("invalid desired_state")
+          generation = desired.get("generation")
+          if not isinstance(generation, int) or generation < 1:
+              raise SystemExit("generation must be positive integer")
+
+          previous_generation = 0
+          if receipt_path.exists():
+              try:
+                  previous_generation = int(json.loads(receipt_path.read_text()).get("generation") or 0)
+              except Exception:
+                  previous_generation = 0
+          if generation < previous_generation:
+              raise SystemExit("stale generation rollback rejected")
+
+          effective = "TERMINATED"
+          now = dt.datetime.now(dt.timezone.utc)
+          if desired["desired_state"] == "RUNNING":
+              requested = dt.datetime.fromisoformat(str(desired.get("requested_at_utc","")).replace("Z","+00:00"))
+              lease = dt.datetime.fromisoformat(str(desired.get("lease_until_utc","")).replace("Z","+00:00"))
+              max_lease = int(cfg.get("max_lease_minutes", 370))
+              if max_lease < 1 or max_lease > 370:
+                  raise SystemExit("max_lease_minutes outside hard bound")
+              if requested <= now + dt.timedelta(minutes=5) and lease > now and lease - requested <= dt.timedelta(minutes=max_lease):
+                  effective = "RUNNING"
+
+          project = str(cfg.get("project_id") or "")
+          provider = str(cfg.get("workload_identity_provider") or "")
+          service_account = str(cfg.get("service_account") or "")
+          zone = str(cfg.get("zone") or "AUTO")
+
+          if configured:
+              if not re.fullmatch(r"[a-z][a-z0-9-]{4,28}[a-z0-9]", project):
+                  raise SystemExit("invalid project_id format")
+              if not re.fullmatch(r"projects/[0-9]+/locations/global/workloadIdentityPools/[A-Za-z0-9_-]+/providers/[A-Za-z0-9_-]+", provider):
+                  raise SystemExit("invalid workload_identity_provider format")
+              if not re.fullmatch(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.iam\.gserviceaccount\.com", service_account):
+                  raise SystemExit("invalid service_account format")
+              if zone != "AUTO" and not re.fullmatch(r"[a-z]+-[a-z0-9]+[0-9]-[a-z]", zone):
+                  raise SystemExit("invalid zone format")
+
+          output("configured", "true" if configured else "false")
+          output("project_id", project)
+          output("provider", provider)
+          output("service_account", service_account)
+          output("zone", zone)
+          output("desired_state", desired["desired_state"])
+          output("effective_state", effective)
+          output("generation", generation)
+          PY
+
+      - name: Record unconfigured fail-closed state
+        if: steps.cfg.outputs.configured != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime as dt, json, os, pathlib
+          p=pathlib.Path(os.environ["CONTROL_DIR"])/"receipt.json"
+          p.write_text(json.dumps({
+            "schema_version":1,
+            "controller":"github-actions-wif",
+            "status":"NOT_CONFIGURED",
+            "generation":int("${{ steps.cfg.outputs.generation }}"),
+            "effective_desired_state":"TERMINATED",
+            "provider_status":"UNKNOWN",
+            "operation":"NONE",
+            "at_utc":dt.datetime.now(dt.timezone.utc).isoformat(timespec="milliseconds"),
+            "error":"WIF config not installed; no GCP operation attempted"
+          },indent=2,sort_keys=True)+"\n")
+          PY
+
+      - name: Authenticate to Google Cloud through WIF
+        if: steps.cfg.outputs.configured == 'true'
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ steps.cfg.outputs.provider }}
+          service_account: ${{ steps.cfg.outputs.service_account }}
+
+      - name: Set up gcloud
+        if: steps.cfg.outputs.configured == 'true'
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Reconcile provider state
+        if: steps.cfg.outputs.configured == 'true'
+        id: reconcile
+        shell: bash
+        env:
+          PROJECT_ID: ${{ steps.cfg.outputs.project_id }}
+          ZONE_HINT: ${{ steps.cfg.outputs.zone }}
+          EFFECTIVE_STATE: ${{ steps.cfg.outputs.effective_state }}
+          GENERATION: ${{ steps.cfg.outputs.generation }}
+        run: |
+          set -euo pipefail
+          started_ms="$(date +%s%3N)"
+
+          if [[ "$ZONE_HINT" == "AUTO" ]]; then
+            mapfile -t matches < <(
+              gcloud compute instances list                 --project "$PROJECT_ID"                 --filter="name=('$INSTANCE_NAME')"                 --format='value(zone.basename())'
+            )
+            if [[ "${#matches[@]}" -ne 1 || -z "${matches[0]}" ]]; then
+              echo "expected exactly one instance named $INSTANCE_NAME; got ${#matches[@]}" >&2
+              exit 40
+            fi
+            ZONE="${matches[0]}"
+          else
+            ZONE="$ZONE_HINT"
+          fi
+
+          status="$(gcloud compute instances describe "$INSTANCE_NAME"             --project "$PROJECT_ID" --zone "$ZONE" --format='value(status)')"
+
+          operation="NONE"
+          if [[ "$EFFECTIVE_STATE" == "RUNNING" ]]; then
+            if [[ "$status" == "TERMINATED" ]]; then
+              gcloud compute instances start "$INSTANCE_NAME"                 --project "$PROJECT_ID" --zone "$ZONE" --quiet
+              operation="START_ACCEPTED"
+            else
+              operation="START_IDEMPOTENT_$status"
+            fi
+            target="RUNNING"
+          else
+            if [[ "$status" == "TERMINATED" || "$status" == "STOPPING" ]]; then
+              operation="STOP_IDEMPOTENT_$status"
+            else
+              gcloud compute instances stop "$INSTANCE_NAME"                 --project "$PROJECT_ID" --zone "$ZONE" --quiet
+              operation="STOP_ACCEPTED"
+            fi
+            target="TERMINATED"
+          fi
+
+          deadline=$(( $(date +%s) + 90 ))
+          final="$status"
+          while (( $(date +%s) <= deadline )); do
+            final="$(gcloud compute instances describe "$INSTANCE_NAME"               --project "$PROJECT_ID" --zone "$ZONE" --format='value(status)')"
+            [[ "$final" == "$target" ]] && break
+            sleep 3
+          done
+
+          verified=false
+          [[ "$final" == "$target" ]] && verified=true
+          elapsed_ms=$(( $(date +%s%3N) - started_ms ))
+
+          python3 - <<PY
+          import datetime as dt, json, os, pathlib
+          p=pathlib.Path(os.environ["CONTROL_DIR"])/"receipt.json"
+          p.write_text(json.dumps({
+            "schema_version":1,
+            "controller":"github-actions-wif",
+            "status":"VERIFIED" if "$verified" == "true" else "TIMEOUT",
+            "generation":int(os.environ["GENERATION"]),
+            "effective_desired_state":os.environ["EFFECTIVE_STATE"],
+            "provider_status":"$final",
+            "project_id":os.environ["PROJECT_ID"],
+            "zone":"$ZONE",
+            "instance_name":os.environ["INSTANCE_NAME"],
+            "operation":"$operation",
+            "provider_verified":("$verified" == "true"),
+            "elapsed_ms":int("$elapsed_ms"),
+            "at_utc":dt.datetime.now(dt.timezone.utc).isoformat(timespec="milliseconds"),
+            "error":"" if "$verified" == "true" else "provider state did not converge within 90s"
+          },indent=2,sort_keys=True)+"\n")
+          PY
+
+          if [[ "$verified" != "true" ]]; then
+            exit 41
+          fi
+
+      - name: Commit compact receipt
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Intelligence Dynamics GCP Controller"
+          git config user.email "gcp-controller@intelligence-dynamics.invalid"
+          git add "$CONTROL_DIR/receipt.json"
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Record Intelligence Dynamics GCP control receipt"
+          git push origin HEAD:intelligence-dynamics-gcp-control
