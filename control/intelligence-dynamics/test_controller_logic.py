@@ -98,8 +98,23 @@ class ControlLogicTests(unittest.TestCase):
                     "projects/123456789/locations/global/"
                     "workloadIdentityPools/github/providers/github"
                 ),
-                service_account="gcp-control@valid-project-123.iam.gserviceaccount.com",
+                service_account="",
                 zone="us-central1-a",
+            ),
+            desired(),
+            now=NOW,
+        )
+        self.assertTrue(got["configured"])
+
+    def test_service_account_proxy_is_optional_but_shape_checked(self):
+        got = validate(
+            cfg(
+                project_id="valid-project-123",
+                workload_identity_provider=(
+                    "projects/123456789/locations/global/"
+                    "workloadIdentityPools/github/providers/github"
+                ),
+                service_account="gcp-control@valid-project-123.iam.gserviceaccount.com",
             ),
             desired(),
             now=NOW,
