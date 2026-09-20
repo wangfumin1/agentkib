@@ -120,8 +120,8 @@ jobs:
           python3 - <<'PY'
           import datetime as dt, json, os, pathlib
           d=pathlib.Path(os.environ["CONTROL_DIR"])/"receipts"
-d.mkdir(parents=True, exist_ok=True)
-p=d/(os.environ["GITHUB_RUN_ID"]+"-"+os.environ["GITHUB_RUN_ATTEMPT"]+".json")
+          d.mkdir(parents=True, exist_ok=True)
+          p=d/(os.environ["GITHUB_RUN_ID"]+"-"+os.environ["GITHUB_RUN_ATTEMPT"]+".json")
           p.write_text(json.dumps({
             "schema_version":1,
             "controller":"github-actions-wif",
@@ -208,8 +208,8 @@ p=d/(os.environ["GITHUB_RUN_ID"]+"-"+os.environ["GITHUB_RUN_ATTEMPT"]+".json")
           python3 - <<PY
           import datetime as dt, json, os, pathlib
           d=pathlib.Path(os.environ["CONTROL_DIR"])/"receipts"
-d.mkdir(parents=True, exist_ok=True)
-p=d/(os.environ["GITHUB_RUN_ID"]+"-"+os.environ["GITHUB_RUN_ATTEMPT"]+".json")
+          d.mkdir(parents=True, exist_ok=True)
+          p=d/(os.environ["GITHUB_RUN_ID"]+"-"+os.environ["GITHUB_RUN_ATTEMPT"]+".json")
           p.write_text(json.dumps({
             "schema_version":1,
             "controller":"github-actions-wif",
