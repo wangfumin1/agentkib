@@ -64,7 +64,7 @@ function sheet_() {
 
 function readControl_() {
   const sh = sheet_();
-  const values = sh.getRange('A1:B14').getValues();
+  const values = sh.getRange('A1:B15').getValues();
   const map = {};
   for (let i = 1; i < values.length; i++) {
     const k = String(values[i][0] || '').trim();
@@ -104,11 +104,13 @@ function readControl_() {
     projectIdHint: String(map.project_id_hint || 'AUTO').trim(),
     maxLeaseMinutes: configuredMax,
     reason: String(map.reason || ''),
+    startArmed: String(map.start_armed || '').toUpperCase() === 'TRUE',
   };
 }
 
 function effectiveDesiredState_(ctl, nowMs) {
   if (ctl.desiredState !== 'RUNNING') return 'TERMINATED';
+  if (ctl.startArmed !== true) return 'TERMINATED';
   if (!ctl.leaseUntilMs) return 'TERMINATED';
   if (ctl.leaseUntilMs <= nowMs) return 'TERMINATED';
 
@@ -473,27 +475,32 @@ function controllerSelfTest() {
   const cases = [
     {
       name: 'terminated always stops',
-      ctl: {desiredState:'TERMINATED', leaseUntilMs:null, requestedAtUtc:'', maxLeaseMinutes:370},
+      ctl: {desiredState:'TERMINATED', startArmed:false, leaseUntilMs:null, requestedAtUtc:'', maxLeaseMinutes:370},
       expected:'TERMINATED'
     },
     {
       name: 'running without lease fails closed',
-      ctl: {desiredState:'RUNNING', leaseUntilMs:null, requestedAtUtc:nowIso_(), maxLeaseMinutes:370},
+      ctl: {desiredState:'RUNNING', startArmed:true, leaseUntilMs:null, requestedAtUtc:nowIso_(), maxLeaseMinutes:370},
       expected:'TERMINATED'
     },
     {
       name: 'expired lease fails closed',
-      ctl: {desiredState:'RUNNING', leaseUntilMs:Date.now()-1000, requestedAtUtc:new Date(Date.now()-60000).toISOString(), maxLeaseMinutes:370},
+      ctl: {desiredState:'RUNNING', startArmed:true, leaseUntilMs:Date.now()-1000, requestedAtUtc:new Date(Date.now()-60000).toISOString(), maxLeaseMinutes:370},
       expected:'TERMINATED'
     },
     {
-      name: 'valid bounded lease runs',
-      ctl: {desiredState:'RUNNING', leaseUntilMs:Date.now()+5*60000, requestedAtUtc:nowIso_(), maxLeaseMinutes:370},
+      name: 'valid lease but unarmed fails closed',
+      ctl: {desiredState:'RUNNING', startArmed:false, leaseUntilMs:Date.now()+5*60000, requestedAtUtc:nowIso_(), maxLeaseMinutes:370},
+      expected:'TERMINATED'
+    },
+    {
+      name: 'valid bounded armed lease runs',
+      ctl: {desiredState:'RUNNING', startArmed:true, leaseUntilMs:Date.now()+5*60000, requestedAtUtc:nowIso_(), maxLeaseMinutes:370},
       expected:'RUNNING'
     },
     {
       name: 'oversized lease fails closed',
-      ctl: {desiredState:'RUNNING', leaseUntilMs:Date.now()+371*60000, requestedAtUtc:nowIso_(), maxLeaseMinutes:370},
+      ctl: {desiredState:'RUNNING', startArmed:true, leaseUntilMs:Date.now()+371*60000, requestedAtUtc:nowIso_(), maxLeaseMinutes:370},
       expected:'TERMINATED'
     },
   ];
