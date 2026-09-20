@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "target_instance": "intelligence-dynamics-worker",
+  "desired_state": "TERMINATED",
+  "generation": 1,
+  "requested_at_utc": "2026-09-20T01:21:36.508Z",
+  "lease_until_utc": "",
+  "reason": "Initial fail-closed state. Do not start paid compute before provider lifecycle control is verified."
+}
