@@ -1,9 +1,10 @@
 {
   "schema_version": 1,
   "target_instance": "intelligence-dynamics-worker",
-  "desired_state": "RUNNING",
-  "generation": 1789867907110,
-  "requested_at_utc": "2026-09-20T01:31:47.110Z",
+  "desired_state": "TERMINATED",
+  "generation": 1789868222573,
+  "requested_at_utc": "2026-09-20T01:37:02.573Z",
   "lease_until_utc": "",
-  "reason": "Integration test: RUNNING without a lease must fail closed to TERMINATED and must not call GCP."
+  "reason": "Fail-closed baseline after integration tests. External lifecycle control is not yet provider-authorized.",
+  "start_armed": false
 }
