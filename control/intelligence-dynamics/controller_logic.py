@@ -97,23 +97,25 @@ def validate(
     provider = str(cfg.get("workload_identity_provider") or "")
     service_account = str(cfg.get("service_account") or "")
     zone = str(cfg.get("zone") or "AUTO")
-    configured = bool(project and provider and service_account)
+    configured = bool(project and provider)
 
     if configured:
         if not PROJECT_RE.fullmatch(project):
             raise ControlError("invalid project_id format")
         if not PROVIDER_RE.fullmatch(provider):
             raise ControlError("invalid workload_identity_provider format")
-        if not SERVICE_ACCOUNT_RE.fullmatch(service_account):
+        if service_account and not SERVICE_ACCOUNT_RE.fullmatch(service_account):
             raise ControlError("invalid service_account format")
         if zone != "AUTO" and not ZONE_RE.fullmatch(zone):
             raise ControlError("invalid zone format")
     else:
         # Partial auth configuration is rejected. Empty-all is the only
         # intentionally unconfigured state.
-        supplied = [bool(project), bool(provider), bool(service_account)]
+        supplied = [bool(project), bool(provider)]
         if any(supplied):
             raise ControlError("partial WIF configuration rejected")
+        if service_account:
+            raise ControlError("service_account cannot be set without direct WIF config")
 
     return {
         "configured": configured,
