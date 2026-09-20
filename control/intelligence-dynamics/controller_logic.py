@@ -82,8 +82,10 @@ def validate(
     if max_lease < 1 or max_lease > MAX_LEASE_MINUTES_HARD:
         raise ControlError("max_lease_minutes outside hard bound")
 
+    start_armed = desired.get("start_armed") is True
+
     effective = "TERMINATED"
-    if desired_state == "RUNNING":
+    if desired_state == "RUNNING" and start_armed:
         requested = _parse_time(desired.get("requested_at_utc"), "requested_at_utc")
         lease_raw = str(desired.get("lease_until_utc") or "").strip()
         if lease_raw:
@@ -126,6 +128,7 @@ def validate(
         "service_account": service_account,
         "zone": zone,
         "desired_state": desired_state,
+        "start_armed": start_armed,
         "effective_state": effective,
         "generation": generation,
     }
