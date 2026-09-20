@@ -49,7 +49,7 @@ jobs:
           node --check /tmp/intelligence-dynamics-controller.js
           printf '\nconsole.log(controllerSelfTest());\n' >> /tmp/intelligence-dynamics-controller.js
           selftest="$(node /tmp/intelligence-dynamics-controller.js)"
-          [[ "$selftest" == "PASS 5" ]]
+          [[ "$selftest" == "PASS 11" ]]
 
       - name: Validate fixed control request
         id: cfg
