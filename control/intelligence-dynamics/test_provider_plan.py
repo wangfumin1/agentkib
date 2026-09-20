@@ -20,6 +20,11 @@ class ProviderPlanTests(unittest.TestCase):
         self.assertEqual("none", got["provider_action"])
         self.assertEqual("TERMINATED", got["target_status"])
 
+    def test_suspended_converges_to_terminated_before_restart(self):
+        got = plan("RUNNING", "SUSPENDED")
+        self.assertEqual("stop", got["provider_action"])
+        self.assertEqual("TERMINATED", got["target_status"])
+
     def test_terminated_is_idempotent_stop(self):
         got = plan("TERMINATED", "TERMINATED")
         self.assertEqual("none", got["provider_action"])
