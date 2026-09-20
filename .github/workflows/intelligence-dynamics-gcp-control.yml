@@ -71,10 +71,18 @@ jobs:
           },indent=2,sort_keys=True)+"\n")
           PY
 
-      - name: Authenticate to Google Cloud through WIF
-        if: steps.cfg.outputs.configured == 'true'
+      - name: Authenticate to Google Cloud through direct WIF
+        if: steps.cfg.outputs.configured == 'true' && steps.cfg.outputs.service_account == ''
         uses: google-github-actions/auth@v3
         with:
+          project_id: ${{ steps.cfg.outputs.project_id }}
+          workload_identity_provider: ${{ steps.cfg.outputs.provider }}
+
+      - name: Authenticate to Google Cloud through service-account WIF
+        if: steps.cfg.outputs.configured == 'true' && steps.cfg.outputs.service_account != ''
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ steps.cfg.outputs.project_id }}
           workload_identity_provider: ${{ steps.cfg.outputs.provider }}
           service_account: ${{ steps.cfg.outputs.service_account }}
 
