@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "target_instance": "intelligence-dynamics-worker",
-  "desired_state": "TERMINATED",
-  "generation": 1,
-  "requested_at_utc": "2026-09-20T01:21:36.508Z",
+  "desired_state": "RUNNING",
+  "generation": 1789867907110,
+  "requested_at_utc": "2026-09-20T01:31:47.110Z",
   "lease_until_utc": "",
-  "reason": "Initial fail-closed state. Do not start paid compute before provider lifecycle control is verified."
+  "reason": "Integration test: RUNNING without a lease must fail closed to TERMINATED and must not call GCP."
 }
