@@ -121,6 +121,36 @@ function effectiveDesiredState_(ctl, nowMs) {
   return 'RUNNING';
 }
 
+function providerPlan_(effectiveState, providerStatus) {
+  const desired = String(effectiveState || '').toUpperCase();
+  const status = String(providerStatus || '').toUpperCase();
+  if (desired !== 'RUNNING' && desired !== 'TERMINATED') {
+    throw new Error('invalid effective state');
+  }
+  if (!status) throw new Error('provider status required');
+
+  if (desired === 'RUNNING') {
+    if (status === 'TERMINATED') {
+      return {action:'start', target:'RUNNING', operation:'START_REQUIRED'};
+    }
+    if (['RUNNING','STAGING','PROVISIONING','REPAIRING'].indexOf(status) >= 0) {
+      return {action:'none', target:'RUNNING', operation:'START_IDEMPOTENT_' + status};
+    }
+    if (status === 'STOPPING' || status === 'SUSPENDING') {
+      return {action:'none', target:'TERMINATED', operation:'START_DEFERRED_' + status};
+    }
+    if (status === 'SUSPENDED') {
+      return {action:'stop', target:'TERMINATED', operation:'START_DEFERRED_SUSPENDED_STOP_REQUIRED'};
+    }
+    throw new Error('unknown provider status: ' + status);
+  }
+
+  if (status === 'TERMINATED' || status === 'STOPPING') {
+    return {action:'none', target:'TERMINATED', operation:'STOP_IDEMPOTENT_' + status};
+  }
+  return {action:'stop', target:'TERMINATED', operation:'STOP_REQUIRED_' + status};
+}
+
 function listProjects_() {
   const projects = [];
   let token = '';
@@ -317,35 +347,21 @@ function reconcile() {
 
     vm = findInstance_();
 
-    if (effective === 'RUNNING') {
-      if (vm.status === 'TERMINATED') {
-        mutateInstance_(vm, 'start');
-        operation = 'START_ACCEPTED';
-        vm = waitForStatus_(vm, 'RUNNING', 45000);
-      } else if (vm.status === 'RUNNING') {
-        operation = 'START_IDEMPOTENT_RUNNING';
-      } else if (vm.status === 'STOPPING' || vm.status === 'SUSPENDING') {
-        operation = 'START_DEFERRED_' + vm.status;
-        vm = waitForStatus_(vm, 'TERMINATED', 45000);
-      } else if (vm.status === 'SUSPENDED') {
-        mutateInstance_(vm, 'stop');
-        operation = 'START_DEFERRED_SUSPENDED_STOP_ACCEPTED';
-        vm = waitForStatus_(vm, 'TERMINATED', 45000);
-      } else {
-        operation = 'START_WAIT_' + vm.status;
-        vm = waitForStatus_(vm, 'RUNNING', 45000);
-      }
-    } else {
-      if (vm.status === 'TERMINATED') {
-        operation = 'STOP_IDEMPOTENT_TERMINATED';
-      } else if (vm.status === 'STOPPING') {
-        operation = 'STOP_IDEMPOTENT_STOPPING';
-        vm = waitForStatus_(vm, 'TERMINATED', 45000);
-      } else {
-        mutateInstance_(vm, 'stop');
-        operation = 'STOP_ACCEPTED';
-        vm = waitForStatus_(vm, 'TERMINATED', 45000);
-      }
+    const plan = providerPlan_(effective, vm.status);
+    operation = plan.operation;
+
+    if (plan.action === 'start') {
+      mutateInstance_(vm, 'start');
+      operation = 'START_ACCEPTED';
+    } else if (plan.action === 'stop') {
+      mutateInstance_(vm, 'stop');
+      operation = effective === 'TERMINATED'
+        ? 'STOP_ACCEPTED'
+        : 'START_DEFERRED_SUSPENDED_STOP_ACCEPTED';
+    }
+
+    if (vm.status !== plan.target || plan.action !== 'none') {
+      vm = waitForStatus_(vm, plan.target, 45000);
     }
 
     props.setProperty('LAST_APPLIED_GENERATION', String(ctl.generation));
@@ -486,6 +502,25 @@ function controllerSelfTest() {
     const got = effectiveDesiredState_(c.ctl, Date.now());
     if (got !== c.expected) failures.push(c.name + ': got ' + got + ', want ' + c.expected);
   });
+
+  const providerCases = [
+    ['RUNNING','TERMINATED','start','RUNNING'],
+    ['RUNNING','RUNNING','none','RUNNING'],
+    ['RUNNING','STOPPING','none','TERMINATED'],
+    ['RUNNING','SUSPENDED','stop','TERMINATED'],
+    ['TERMINATED','RUNNING','stop','TERMINATED'],
+    ['TERMINATED','TERMINATED','none','TERMINATED'],
+  ];
+  providerCases.forEach(function(pc) {
+    const got = providerPlan_(pc[0], pc[1]);
+    if (got.action !== pc[2] || got.target !== pc[3]) {
+      failures.push(
+        'provider plan ' + pc[0] + '/' + pc[1]
+        + ': got ' + JSON.stringify(got)
+      );
+    }
+  });
+
   if (failures.length) throw new Error('self-test failed: ' + failures.join('; '));
-  return 'PASS ' + cases.length;
+  return 'PASS ' + (cases.length + providerCases.length);
 }
