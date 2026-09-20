@@ -51,7 +51,7 @@ jobs:
           node --check /tmp/intelligence-dynamics-bootstrap.js
           printf '\nconsole.log(controllerSelfTest());\n' >> /tmp/intelligence-dynamics-controller.js
           selftest="$(node /tmp/intelligence-dynamics-controller.js)"
-          [[ "$selftest" == "PASS 11" ]]
+          [[ "$selftest" == "PASS 12" ]]
 
           python3 - <<'PY'
           import json, pathlib
