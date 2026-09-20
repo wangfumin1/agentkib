@@ -46,10 +46,27 @@ jobs:
           python3 test_provider_plan.py
 
           cp apps-script/Code.gs /tmp/intelligence-dynamics-controller.js
+          cp apps-script/Bootstrap.gs /tmp/intelligence-dynamics-bootstrap.js
           node --check /tmp/intelligence-dynamics-controller.js
+          node --check /tmp/intelligence-dynamics-bootstrap.js
           printf '\nconsole.log(controllerSelfTest());\n' >> /tmp/intelligence-dynamics-controller.js
           selftest="$(node /tmp/intelligence-dynamics-controller.js)"
           [[ "$selftest" == "PASS 11" ]]
+
+          python3 - <<'PY'
+          import json, pathlib
+          manifest = json.loads(pathlib.Path("apps-script/appsscript.json").read_text())
+          scopes = set(manifest.get("oauthScopes", []))
+          required = {
+              "https://www.googleapis.com/auth/script.external_request",
+              "https://www.googleapis.com/auth/spreadsheets",
+              "https://www.googleapis.com/auth/compute",
+              "https://www.googleapis.com/auth/cloud-platform.read-only",
+          }
+          missing = required - scopes
+          if missing:
+              raise SystemExit(f"Apps Script manifest missing scopes: {sorted(missing)}")
+          PY
 
       - name: Validate fixed control request
         id: cfg
