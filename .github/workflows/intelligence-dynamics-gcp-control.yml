@@ -36,6 +36,7 @@ jobs:
           set -euo pipefail
           cd "$CONTROL_DIR"
           python3 test_controller_logic.py
+          python3 test_provider_plan.py
 
       - name: Validate fixed control request
         id: cfg
@@ -118,24 +119,33 @@ jobs:
 
           status="$(gcloud compute instances describe "$INSTANCE_NAME"             --project "$PROJECT_ID" --zone "$ZONE" --format='value(status)')"
 
-          operation="NONE"
-          if [[ "$EFFECTIVE_STATE" == "RUNNING" ]]; then
-            if [[ "$status" == "TERMINATED" ]]; then
-              gcloud compute instances start "$INSTANCE_NAME"                 --project "$PROJECT_ID" --zone "$ZONE" --quiet
+          plan_json="$(python3 "$CONTROL_DIR/provider_plan.py" \
+            --effective-state "$EFFECTIVE_STATE" \
+            --provider-status "$status")"
+          provider_action="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["provider_action"])' <<<"$plan_json")"
+          target="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["target_status"])' <<<"$plan_json")"
+          operation="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["operation"])' <<<"$plan_json")"
+
+          case "$provider_action" in
+            start)
+              gcloud compute instances start "$INSTANCE_NAME" \
+                --project "$PROJECT_ID" --zone "$ZONE" --quiet
               operation="START_ACCEPTED"
-            else
-              operation="START_IDEMPOTENT_$status"
-            fi
-            target="RUNNING"
-          else
-            if [[ "$status" == "TERMINATED" || "$status" == "STOPPING" ]]; then
-              operation="STOP_IDEMPOTENT_$status"
-            else
-              gcloud compute instances stop "$INSTANCE_NAME"                 --project "$PROJECT_ID" --zone "$ZONE" --quiet
-              operation="STOP_ACCEPTED"
-            fi
-            target="TERMINATED"
-          fi
+              ;;
+            stop)
+              gcloud compute instances stop "$INSTANCE_NAME" \
+                --project "$PROJECT_ID" --zone "$ZONE" --quiet
+              if [[ "$EFFECTIVE_STATE" == "TERMINATED" ]]; then
+                operation="STOP_ACCEPTED"
+              fi
+              ;;
+            none)
+              ;;
+            *)
+              echo "planner emitted unsupported action: $provider_action" >&2
+              exit 42
+              ;;
+          esac
 
           deadline=$(( $(date +%s) + 90 ))
           final="$status"
