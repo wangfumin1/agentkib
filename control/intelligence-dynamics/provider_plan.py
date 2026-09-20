@@ -4,8 +4,8 @@ from __future__ import annotations
 import argparse
 import json
 
-RUNNING_STATES = {"RUNNING", "STAGING", "PROVISIONING", "REPAIRING", "SUSPENDING"}
-STOPPING_STATES = {"STOPPING", "SUSPENDED"}
+RUNNING_STATES = {"RUNNING", "STAGING", "PROVISIONING", "REPAIRING"}
+STOPPING_STATES = {"STOPPING", "SUSPENDING"}
 TERMINATED_STATES = {"TERMINATED"}
 
 
@@ -34,13 +34,22 @@ def plan(effective_state: str, provider_status: str) -> dict[str, str | bool]:
                 "operation": f"START_IDEMPOTENT_{provider_status}",
             }
         if provider_status in STOPPING_STATES:
-            # Never race a stop with a start. Let this control invocation fail
-            # closed; a later invocation may start after full termination.
+            # Never race an in-flight stop/suspend with a start. Verify that
+            # the machine reaches TERMINATED before a later invocation starts.
             return {
                 "provider_action": "none",
                 "target_status": "TERMINATED",
                 "idempotent": True,
                 "operation": f"START_DEFERRED_{provider_status}",
+            }
+        if provider_status == "SUSPENDED":
+            # This controller intentionally has no resume verb. Converge to the
+            # safe baseline first; a later generation can start from TERMINATED.
+            return {
+                "provider_action": "stop",
+                "target_status": "TERMINATED",
+                "idempotent": False,
+                "operation": "START_DEFERRED_SUSPENDED_STOP_REQUIRED",
             }
         raise ValueError(f"unknown provider_status: {provider_status}")
 
