@@ -26,7 +26,20 @@ function loadControllerModule_() {
 }
 
 function reconcile() {
-  return loadControllerModule_().reconcile();
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) {
+    console.log(JSON.stringify({
+      event: 'reconcile-skipped',
+      reason: 'overlapping-controller-run',
+      at: new Date().toISOString(),
+    }));
+    return 'SKIPPED_OVERLAP';
+  }
+  try {
+    return loadControllerModule_().reconcile();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function controllerSelfTest() {
