@@ -30,87 +30,23 @@ jobs:
         with:
           ref: intelligence-dynamics-gcp-control
 
+      - name: Validate controller logic tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$CONTROL_DIR"
+          python3 test_controller_logic.py
+
       - name: Validate fixed control request
         id: cfg
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import datetime as dt, json, os, pathlib, re
-
-          root = pathlib.Path(os.environ["CONTROL_DIR"])
-          cfg = json.loads((root / "config.json").read_text())
-          desired = json.loads((root / "desired.json").read_text())
-          receipts_dir = root / "receipts"
-
-          def output(k, v):
-              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
-                  f.write(f"{k}={v}\n")
-
-          configured = all([
-              cfg.get("project_id"),
-              cfg.get("workload_identity_provider"),
-              cfg.get("service_account"),
-          ])
-
-          if desired.get("schema_version") != 1:
-              raise SystemExit("invalid desired schema_version")
-          if desired.get("target_instance") != os.environ["INSTANCE_NAME"]:
-              raise SystemExit("target instance mismatch")
-          if desired.get("desired_state") not in {"RUNNING", "TERMINATED"}:
-              raise SystemExit("invalid desired_state")
-          generation = desired.get("generation")
-          if not isinstance(generation, int) or generation < 1:
-              raise SystemExit("generation must be positive integer")
-
-          previous_generation = 0
-          if receipts_dir.exists():
-              for rp in receipts_dir.glob("*.json"):
-                  try:
-                      previous_generation = max(
-                          previous_generation,
-                          int(json.loads(rp.read_text()).get("generation") or 0),
-                      )
-                  except Exception:
-                      pass
-          if generation < previous_generation:
-              raise SystemExit("stale generation rollback rejected")
-
-          effective = "TERMINATED"
-          now = dt.datetime.now(dt.timezone.utc)
-          if desired["desired_state"] == "RUNNING":
-              requested = dt.datetime.fromisoformat(str(desired.get("requested_at_utc","")).replace("Z","+00:00"))
-              lease = dt.datetime.fromisoformat(str(desired.get("lease_until_utc","")).replace("Z","+00:00"))
-              max_lease = int(cfg.get("max_lease_minutes", 370))
-              if max_lease < 1 or max_lease > 370:
-                  raise SystemExit("max_lease_minutes outside hard bound")
-              if requested <= now + dt.timedelta(minutes=5) and lease > now and lease - requested <= dt.timedelta(minutes=max_lease):
-                  effective = "RUNNING"
-
-          project = str(cfg.get("project_id") or "")
-          provider = str(cfg.get("workload_identity_provider") or "")
-          service_account = str(cfg.get("service_account") or "")
-          zone = str(cfg.get("zone") or "AUTO")
-
-          if configured:
-              if not re.fullmatch(r"[a-z][a-z0-9-]{4,28}[a-z0-9]", project):
-                  raise SystemExit("invalid project_id format")
-              if not re.fullmatch(r"projects/[0-9]+/locations/global/workloadIdentityPools/[A-Za-z0-9_-]+/providers/[A-Za-z0-9_-]+", provider):
-                  raise SystemExit("invalid workload_identity_provider format")
-              if not re.fullmatch(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.iam\.gserviceaccount\.com", service_account):
-                  raise SystemExit("invalid service_account format")
-              if zone != "AUTO" and not re.fullmatch(r"[a-z]+-[a-z0-9]+[0-9]-[a-z]", zone):
-                  raise SystemExit("invalid zone format")
-
-          output("configured", "true" if configured else "false")
-          output("project_id", project)
-          output("provider", provider)
-          output("service_account", service_account)
-          output("zone", zone)
-          output("desired_state", desired["desired_state"])
-          output("effective_state", effective)
-          output("generation", generation)
-          PY
+          python3 "$CONTROL_DIR/controller_logic.py" \
+            --config "$CONTROL_DIR/config.json" \
+            --desired "$CONTROL_DIR/desired.json" \
+            --receipts "$CONTROL_DIR/receipts" \
+            --github-output "$GITHUB_OUTPUT"
 
       - name: Record unconfigured fail-closed state
         if: steps.cfg.outputs.configured != 'true'
