@@ -7,6 +7,8 @@ on:
     paths:
       - "control/intelligence-dynamics/config.json"
       - "control/intelligence-dynamics/desired.json"
+      - "control/intelligence-dynamics/*.py"
+      - "control/intelligence-dynamics/wif-spec.json"
       - ".github/workflows/intelligence-dynamics-gcp-control.yml"
   workflow_dispatch:
 
