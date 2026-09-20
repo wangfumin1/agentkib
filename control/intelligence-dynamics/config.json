@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "controller": "github-actions-wif",
+  "project_id": "",
+  "workload_identity_provider": "",
+  "service_account": "",
+  "zone": "AUTO",
+  "max_lease_minutes": 370,
+  "target_instance": "intelligence-dynamics-worker",
+  "note": "Fail-closed until one-time GCP WIF authorization is installed. Standard GitHub-hosted runners are free for this public repository."
+}
