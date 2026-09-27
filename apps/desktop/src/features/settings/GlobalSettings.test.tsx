@@ -83,9 +83,7 @@ describe("GlobalSettings diagnostics health", () => {
         await act(() => changeLocale(locale));
 
         const general = render(<GlobalSettings {...baseProps} section="general" />);
-        expect(
-          screen.getByRole("switch", { name: tr("settings.localAutoRefresh") }),
-        ).toBeTruthy();
+        expect(screen.getByRole("switch", { name: tr("settings.localAutoRefresh") })).toBeTruthy();
         expect(screen.getByRole("switch", { name: tr("settings.quotaAutoRefresh") })).toBeTruthy();
         general.unmount();
 
