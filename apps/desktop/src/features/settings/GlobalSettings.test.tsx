@@ -86,15 +86,11 @@ describe("GlobalSettings diagnostics health", () => {
         expect(
           screen.getByRole("switch", { name: tr("settings.localAutoRefresh") }),
         ).toBeTruthy();
-        expect(
-          screen.getByRole("switch", { name: tr("settings.quotaAutoRefresh") }),
-        ).toBeTruthy();
+        expect(screen.getByRole("switch", { name: tr("settings.quotaAutoRefresh") })).toBeTruthy();
         general.unmount();
 
         const privacy = render(<GlobalSettings {...baseProps} section="privacy" />);
-        expect(
-          screen.getByRole("switch", { name: tr("conversations.indexSetting") }),
-        ).toBeTruthy();
+        expect(screen.getByRole("switch", { name: tr("conversations.indexSetting") })).toBeTruthy();
         expect(
           screen.getByRole("textbox", { name: tr("settings.gitAliasPlaceholder") }),
         ).toBeTruthy();
