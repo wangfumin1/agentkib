@@ -3,6 +3,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { changeLocale, formatDateTime, initializeI18n, tr } from "@/core/i18n";
+import { AppDialogProvider } from "@/components/AppDialogProvider";
 import type { GlobalSettingsProps } from "./GlobalSettings";
 import { GlobalSettings } from "./GlobalSettings";
 
@@ -87,7 +88,11 @@ describe("GlobalSettings diagnostics health", () => {
         expect(screen.getByRole("switch", { name: tr("settings.quotaAutoRefresh") })).toBeTruthy();
         general.unmount();
 
-        const privacy = render(<GlobalSettings {...baseProps} section="privacy" />);
+        const privacy = render(
+          <AppDialogProvider>
+            <GlobalSettings {...baseProps} section="privacy" />
+          </AppDialogProvider>,
+        );
         expect(screen.getByRole("switch", { name: tr("conversations.indexSetting") })).toBeTruthy();
         expect(
           screen.getByRole("textbox", { name: tr("settings.gitAliasPlaceholder") }),
