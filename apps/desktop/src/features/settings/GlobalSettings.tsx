@@ -687,6 +687,7 @@ function QuotaAutoRefreshSetting({
         </SettingsCopy>
         <Label className="inline-flex items-center justify-self-end">
           <Switch
+            aria-label={tr("settings.localAutoRefresh")}
             checked={runtime?.local_auto_refresh_enabled !== false}
             disabled={busy || !runtime}
             onCheckedChange={(checked) => void toggle(checked, true)}
@@ -699,6 +700,7 @@ function QuotaAutoRefreshSetting({
         </SettingsCopy>
         <Label className="inline-flex items-center justify-self-end">
           <Switch
+            aria-label={tr("settings.quotaAutoRefresh")}
             checked={runtime?.quota_auto_refresh_enabled === true}
             disabled={busy || !runtime}
             onCheckedChange={(checked) => void toggle(checked)}
@@ -785,6 +787,7 @@ function ConversationPrivacySettings({
         </SettingsCopy>
         <Label className="inline-flex items-center justify-self-end">
           <Switch
+            aria-label={tr("conversations.indexSetting")}
             checked={runtime?.session_index_enabled !== false}
             disabled={busy}
             onCheckedChange={(checked) => void toggle(checked)}
@@ -986,6 +989,7 @@ function GitIdentitySettings() {
       )}
       <div className="flex flex-col gap-2.5 border-b border-border/60 p-5 sm:flex-row">
         <Input
+          aria-label={tr("settings.gitAliasPlaceholder")}
           className="min-w-0 flex-1"
           type="email"
           value={email}

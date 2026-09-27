@@ -77,6 +77,34 @@ describe("GlobalSettings diagnostics health", () => {
     }
   });
 
+  it("gives adjacent settings controls localized accessible names", async () => {
+    try {
+      for (const locale of ["zh-CN", "zh-TW", "ja-JP", "en-US"] as const) {
+        await act(() => changeLocale(locale));
+
+        const general = render(<GlobalSettings {...baseProps} section="general" />);
+        expect(
+          screen.getByRole("switch", { name: tr("settings.localAutoRefresh") }),
+        ).toBeTruthy();
+        expect(
+          screen.getByRole("switch", { name: tr("settings.quotaAutoRefresh") }),
+        ).toBeTruthy();
+        general.unmount();
+
+        const privacy = render(<GlobalSettings {...baseProps} section="privacy" />);
+        expect(
+          screen.getByRole("switch", { name: tr("conversations.indexSetting") }),
+        ).toBeTruthy();
+        expect(
+          screen.getByRole("textbox", { name: tr("settings.gitAliasPlaceholder") }),
+        ).toBeTruthy();
+        privacy.unmount();
+      }
+    } finally {
+      await act(() => changeLocale("en-US"));
+    }
+  });
+
   it.each([
     { quotaStatus: undefined, insightsStatus },
     { quotaStatus, insightsStatus: undefined },
