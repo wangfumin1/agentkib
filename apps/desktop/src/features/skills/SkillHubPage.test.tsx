@@ -106,9 +106,7 @@ describe("SkillHubPage", () => {
     try {
       for (const locale of ["en-US", "zh-CN", "zh-TW", "ja-JP"] as const) {
         await act(() => changeLocale(locale));
-        expect(
-          screen.getByRole("textbox", { name: tr("skills.addFromGithub") }),
-        ).toBeTruthy();
+        expect(screen.getByRole("textbox", { name: tr("skills.addFromGithub") })).toBeTruthy();
         expect(screen.getByRole("textbox", { name: tr("skills.search") })).toBeTruthy();
       }
     } finally {
