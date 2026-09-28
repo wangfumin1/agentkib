@@ -437,6 +437,7 @@ export function SkillHubPage({ workspaceAssets, workspaces, onOpen, onReload }: 
             </CardHeader>
             <CardContent className="flex flex-col gap-2 p-4 pt-2 sm:flex-row">
               <Input
+                aria-label={tr("skills.addFromGithub")}
                 value={url}
                 disabled={busy === "discover-url"}
                 onChange={(event) => {
@@ -473,6 +474,7 @@ export function SkillHubPage({ workspaceAssets, workspaces, onOpen, onReload }: 
               <label className="flex h-9 items-center gap-2 rounded-lg border bg-card px-3 text-muted-foreground">
                 <Search size={14} />
                 <Input
+                  aria-label={tr("skills.search")}
                   className="h-7 w-44 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}

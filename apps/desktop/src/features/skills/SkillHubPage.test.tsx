@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { AppDialogProvider } from "@/components/AppDialogProvider";
-import { changeLocale, initializeI18n, localizeMessage } from "@/core/i18n";
+import { changeLocale, initializeI18n, localizeMessage, tr } from "@/core/i18n";
 import type { SkillCandidate, SkillOperationPreview } from "@/core/types";
 import { SkillHubPage } from "./SkillHubPage";
 
@@ -83,6 +83,37 @@ describe("SkillHubPage", () => {
     expect(screen.getByText("Local unmanaged")).toBeTruthy();
     expect(screen.getByRole("tab", { name: /Workspace usage/ })).toBeTruthy();
     expect(screen.getByText(/not enabled for any Agent automatically/)).toBeTruthy();
+  });
+
+  it("exposes localized accessible names for discover inputs", async () => {
+    mocks.installedSkills.mockResolvedValue([]);
+    mocks.removedSkills.mockResolvedValue([]);
+    mocks.skillCatalog.mockResolvedValue({
+      entries: [],
+      cached_at: "2026-09-02T00:00:00Z",
+      stale: false,
+    });
+    const user = userEvent.setup();
+
+    render(
+      <AppDialogProvider>
+        <SkillHubPage workspaceAssets={[]} workspaces={[]} onOpen={vi.fn()} onReload={vi.fn()} />
+      </AppDialogProvider>,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Discover" }));
+
+    try {
+      for (const locale of ["en-US", "zh-CN", "zh-TW", "ja-JP"] as const) {
+        await act(() => changeLocale(locale));
+        expect(
+          screen.getByRole("textbox", { name: tr("skills.addFromGithub") }),
+        ).toBeTruthy();
+        expect(screen.getByRole("textbox", { name: tr("skills.search") })).toBeTruthy();
+      }
+    } finally {
+      await act(() => changeLocale("en-US"));
+    }
   });
 
   it("reviews an immutable curated package before adding it", async () => {
